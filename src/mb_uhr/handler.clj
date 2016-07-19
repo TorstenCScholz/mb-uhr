@@ -27,8 +27,8 @@
 
 (defn get-departure-parts [response-string]
   (let [matches (re-seq departure-regex response-string)]
-    (doseq [[_ bus-line _ departure-value] matches]
-      {:bus-line bus-line :departure-value departure-value}))) ; TODO: Build a set? of maps, but how?
+      (println (map #(-> (zipmap [:_ :bus-line :_ :departure-value] %) (dissoc :_)) matches))
+      (map #(-> (zipmap [:_ :bus-line :_ :departure-value] %) (dissoc :_)) matches)))
 
 (defn get-departure-time [dep-time-str]
   (cond
@@ -39,23 +39,28 @@
 (defn calculate-departure-at [departure-value]
   (if (= (get-departure-time departure-value) :now)
     (java.util.Date.)
-    (let [[_ min-until-arrival] (re-find departure-at-regex departure-value) ; TODO: Handle non-matches
-          dateformatter (SimpleDateFormat. "HH:mm" Locale/GERMANY)
-          calendar (Calendar/getInstance)]
-      (.setTime calendar (new Date))
-      (.add calendar Calendar/MINUTE (Integer/parseInt min-until-arrival))
-      (.format dateformatter (.getTime calendar)))))
+    (let [[regex-matched min-until-arrival] (re-find departure-at-regex departure-value)]
+      (if regex-matched ; need to transform "165min" into other format
+        (let [dateformatter (SimpleDateFormat. "HH:mm" Locale/GERMANY)
+              calendar (Calendar/getInstance)]
+          (doto calendar
+            (.setTime (new Date))
+            (.add Calendar/MINUTE (Integer/parseInt min-until-arrival)))
+          (.format dateformatter (.getTime calendar)))
+        departure-value)))) ; value is already in correct format
 
 (defn calculate-departure-in [departure-value]
   (if (= (get-departure-time departure-value) :now)
     "0"
     :in)) ; TODO
 
-(defn transform-model [raw]
-  (-> raw (assoc
-            :departure-at (calculate-departure-at (:departure-value raw))
-            :departure-in (calculate-departure-in (:departure-value raw)))
-          (dissoc :departure-value)))
+(defn transform-model [raw-seq]
+  (map #(-> %
+            (assoc
+              :departure-at (calculate-departure-at (:departure-value %))
+              :departure-in (calculate-departure-in (:departure-value %)))
+            (dissoc :departure-value))
+       raw-seq))
 
 (defroutes app-routes
   (GET "/departures/:id" [id]
