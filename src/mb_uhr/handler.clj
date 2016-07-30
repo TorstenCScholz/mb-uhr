@@ -82,12 +82,28 @@
             (dissoc :departure-value))
        raw-seq))
 
+(defn get-regexp-structure []
+  {
+    :regexp (str departure-regex)
+    :regexp_groups {
+      :bus_line {
+        :regexp_groups [1]
+        :optional false
+      }
+      :departure_value {
+        :regexp_groups [3]
+        :optional false
+      }
+    }})
+
 (defroutes app-routes
   (GET "/departures/:id" [id]
     (rr/response
       (-> (get-response-string id)
           (get-departure-parts)
           (transform-model))))
+  (GET "/regexpStructure" []
+    (rr/response (get-regexp-structure)))
   (route/not-found "Not Found"))
 
 (def app
